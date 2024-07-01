@@ -945,6 +945,8 @@ enum {
 
 	TCA_FQ_WEIGHTS,		/* Weights for each band */
 
+	TCA_FQ_CWR_THRESHOLD,	/* CWR threshold to prevent bufferbloat */
+
 	__TCA_FQ_MAX
 };
 
@@ -969,10 +971,7 @@ struct tc_fq_qd_stats {
 	__u64	ce_mark;		/* packets above ce_threshold */
 	__u64	horizon_drops;
 	__u64	horizon_caps;
-	__u64	fastpath_packets;
-	__u64	band_drops[FQ_BANDS];
-	__u32	band_pkt_count[FQ_BANDS];
-	__u32	pad;
+	__u64	cwr_num;
 };
 
 /* Heavy-Hitter Filter */

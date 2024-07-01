@@ -30,7 +30,8 @@ static void explain(void)
 		"		[ timer_slack TIME]\n"
 		"		[ ce_threshold TIME ]\n"
 		"		[ horizon TIME ]\n"
-		"		[ horizon_{cap|drop} ]\n");
+		"		[ horizon_{cap|drop} ]\n"
+		"		[ cwr_threshold TIME ]\n");
 }
 
 static unsigned int ilog2(unsigned int val)
@@ -59,6 +60,7 @@ static int fq_parse_opt(struct qdisc_util *qu, int argc, char **argv,
 	unsigned int refill_delay;
 	unsigned int orphan_mask;
 	unsigned int ce_threshold;
+	unsigned int cwr_threshold;
 	unsigned int timer_slack;
 	unsigned int horizon;
 	__u8 horizon_drop = 255;
@@ -72,6 +74,7 @@ static int fq_parse_opt(struct qdisc_util *qu, int argc, char **argv,
 	bool set_orphan_mask = false;
 	bool set_low_rate_threshold = false;
 	bool set_ce_threshold = false;
+	bool set_cwr_threshold = false;
 	bool set_timer_slack = false;
 	bool set_horizon = false;
 	int pacing = -1;
@@ -149,6 +152,13 @@ static int fq_parse_opt(struct qdisc_util *qu, int argc, char **argv,
 				return -1;
 			}
 			set_horizon = true;
+		} else if (strcmp(*argv, "cwr_threshold")) {
+			NEXT_ARG();
+			if (get_time(&cwr_threshold, *argv)) {
+				fprintf(stderr, "Illegal \"cwr_threshold\"\n");
+				return -1;
+			}
+			set_cwr_threshold = true;
 		} else if (strcmp(*argv, "defrate") == 0) {
 			NEXT_ARG();
 			if (strchr(*argv, '%')) {
@@ -243,6 +253,9 @@ static int fq_parse_opt(struct qdisc_util *qu, int argc, char **argv,
 	if (set_ce_threshold)
 		addattr_l(n, 1024, TCA_FQ_CE_THRESHOLD,
 			  &ce_threshold, sizeof(ce_threshold));
+	if (set_cwr_threshold)
+		addattr_l(n, 1024, TCA_FQ_CWR_THRESHOLD,
+			  &cwr_threshold, sizeof(cwr_threshold));
 	if (set_timer_slack)
 		addattr_l(n, 1024, TCA_FQ_TIMER_SLACK,
 			  &timer_slack, sizeof(timer_slack));
@@ -266,6 +279,7 @@ static int fq_print_opt(struct qdisc_util *qu, FILE *f, struct rtattr *opt)
 	unsigned int refill_delay;
 	unsigned int orphan_mask;
 	unsigned int ce_threshold;
+	unsigned int cwr_threshold;
 	unsigned int timer_slack;
 	unsigned int horizon;
 	__u8 horizon_drop;
@@ -360,6 +374,17 @@ static int fq_print_opt(struct qdisc_util *qu, FILE *f, struct rtattr *opt)
 		}
 	}
 
+	if (tb[TCA_FQ_CWR_THRESHOLD] &&
+	    RTA_PAYLOAD(tb[TCA_FQ_CWR_THRESHOLD]) >= sizeof(__u32)) {
+		cwr_threshold = rta_getattr_u32(tb[TCA_FQ_CWR_THRESHOLD]);
+		if (cwr_threshold != ~0U) {
+			print_uint(PRINT_JSON, "cwr_threshold", NULL,
+				   cwr_threshold);
+			print_string(PRINT_FP, NULL, "cwr_threshold %s ",
+				     sprint_time(cwr_threshold, b1));
+		}
+	}
+
 	if (tb[TCA_FQ_TIMER_SLACK] &&
 	    RTA_PAYLOAD(tb[TCA_FQ_TIMER_SLACK]) >= sizeof(__u32)) {
 		timer_slack = rta_getattr_u32(tb[TCA_FQ_TIMER_SLACK]);
@@ -436,6 +461,9 @@ static int fq_print_xstats(struct qdisc_util *qu, FILE *f,
 	if (st->ce_mark)
 		print_lluint(PRINT_ANY, "ce_mark", " ce_mark %llu",
 			     st->ce_mark);
+
+	if (st->cwr_num)
+		print_lluint(PRINT_ANY, "cwr", " cwr %llu", st->cwr_num);
 
 	if (st->flows_plimit)
 		print_lluint(PRINT_ANY, "flows_plimit", " flows_plimit %llu",
